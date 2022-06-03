@@ -1,23 +1,21 @@
+// gchat is a simple client for posting text messages to Google Chat via webhook
 package gchat
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 )
 
-type (
-	PostWebhookOptions struct {
-		Endpoint string
-		Payload  WebhookPayload
-	}
-	WebhookPayload struct {
-		Text string `json:"text"`
-	}
-)
+var ErrNoEndpoint = errors.New("gchat: no endpoint provided")
+
+type WebhookPayload struct {
+	Text string `json:"text"`
+}
 
 type WebhookClient struct {
 	Endpoint string
@@ -25,6 +23,10 @@ type WebhookClient struct {
 }
 
 func (c *WebhookClient) Post(ctx context.Context, p WebhookPayload) error {
+	if c.Endpoint == "" {
+		return ErrNoEndpoint
+	}
+
 	b, err := json.Marshal(p)
 	if err != nil {
 		return fmt.Errorf("gchat: marshal webhook payload: %w", err)
@@ -33,7 +35,13 @@ func (c *WebhookClient) Post(ctx context.Context, p WebhookPayload) error {
 	if err != nil {
 		return fmt.Errorf("gchat: create http request: %w", err)
 	}
-	res, err := c.Client.Do(req)
+
+	client := c.Client
+	if c.Client == nil {
+		client = http.DefaultClient
+	}
+
+	res, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("gchat: post message: %w", err)
 	}
